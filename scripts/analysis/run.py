@@ -1,17 +1,12 @@
-"""Run the three analytical stages against a read-only ODS database."""
+"""Run the three analytical stages using the ODS schema of the unified database."""
 import argparse
 from pathlib import Path
 import duckdb
 
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument("--input", type=Path, required=True)
-parser.add_argument("--output", type=Path, required=True)
+parser.add_argument("--database", type=Path, required=True)
 args = parser.parse_args()
-if not args.input.is_file() or args.input.resolve() == args.output.resolve():
-    parser.error("Provide an existing ODS file and a separate results file.")
-with duckdb.connect(str(args.output)) as db:
-    path = str(args.input.resolve()).replace("'", "''")
-    db.execute(f"ATTACH '{path}' AS src (READ_ONLY)")
+with duckdb.connect(str(args.database)) as db:
     db.execute("SET threads=12")
     db.execute("SET memory_limit='42GiB'")
     db.execute("BEGIN")

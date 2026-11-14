@@ -1,9 +1,10 @@
+USE validation;
 -- Consecutive-hour tests use calendar timestamps, including midnight crossings.
 CREATE TEMP TABLE extra_ev AS
 WITH h AS (
  SELECT customer_number id, usage_date d, hour_ending he, hourly_kwh k,
         usage_date + (hour_ending-1)*INTERVAL '1 hour' ts
- FROM odsdb.ods.ami_hourly
+ FROM ods.ami_hourly
 ), adjacent AS (
  SELECT *, lag(k) OVER w prev,lead(k) OVER w nxt,lag(ts) OVER w before_ts,lead(ts) OVER w after_ts
  FROM h WINDOW w AS (PARTITION BY id ORDER BY ts)
@@ -23,7 +24,7 @@ FROM days GROUP BY id;
 CREATE TEMP TABLE extra_hp AS
 WITH wx AS (
  SELECT observation_date d,avg(temp) t FROM (
- SELECT observation_date,observation_time,avg(temp) temp FROM odsdb.ods.weather_hourly GROUP BY ALL
+ SELECT observation_date,observation_time,avg(temp) temp FROM ods.weather_hourly GROUP BY ALL
  ) GROUP BY d
 )
 SELECT id,regr_slope(mean_kw,t) FILTER(WHERE t<55) winter_slope,
@@ -32,4 +33,4 @@ SELECT id,regr_slope(mean_kw,t) FILTER(WHERE t<55) winter_slope,
  avg(mean_kw) FILTER(WHERE t BETWEEN 35 AND 50)-avg(mean_kw) FILTER(WHERE t BETWEEN 55 AND 65) shoulder_heat,
  avg(low_kw) FILTER(WHERE t<35)-avg(low_kw) FILTER(WHERE t BETWEEN 55 AND 65) cold_base,
  avg(night_kwh/6) FILTER(WHERE t<35)-avg(night_kwh/6) FILTER(WHERE t BETWEEN 55 AND 65) cold_night
-FROM baseline.daily JOIN wx USING(d) GROUP BY id;
+FROM intermediate.daily JOIN wx USING(d) GROUP BY id;

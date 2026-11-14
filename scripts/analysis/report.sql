@@ -1,3 +1,4 @@
+USE intermediate;
 select count(*) customers, countif(sufficient_history) eligible,countif(ev_l2_signature) l2,countif(ev_l1_signature) l1,countif(ac_signature) ac,countif(hp_signature) hp,countif(strong_electric_heating_candidate) strong_electric_heating_candidate,countif(water_heater_signature) water,countif(pool_signature) pool,countif(hot_tub_signature) tub,countif(known_pv) pv,countif(pv_storage_signature) storage from classification;
 select countif(ev_reference and sufficient_history) ev_eval,countif(ev_reference and (ev_l2_signature or ev_l1_signature)) ev_hits,countif(hp_reference and sufficient_history) hp_eval,countif(hp_reference and hp_signature) hp_hits from classification;
 select segment,count(*) households,round(avg(evening_kw),2) evening_kw from segments join features using(id) group by 1 order by 2 desc;

@@ -2,9 +2,9 @@
 
 From the repository root, run the existing baseline analysis first, then run
 `python scripts/analysis/part1/validate.py` and
-`duckdb -readonly database/part1_validation.duckdb < scripts/analysis/part1/report.sql`.
+`duckdb -readonly database/meter_to_action.duckdb < scripts/analysis/part1/report.sql`.
 Runtime versions: DuckDB 2.0.0, NumPy 2.5.4 and scikit-learn 1.9.1.
-Use --ods, --baseline and --output to override file locations.
+Use --database to override the warehouse location.
 
 Each technology uses stratified five-fold customer splits with a fixed seed.
 Within each fold, review as many customers as the original rule selected.
@@ -18,7 +18,7 @@ The reference_audit table includes every listed customer, measured rule inputs,
 baseline miss reason, and out-of-fold selection. Examine all missed IDs with:
 
 ```sql
-SELECT * FROM reference_audit WHERE old_hit IS FALSE ORDER BY technology, id;
+SELECT * FROM validation.reference_audit WHERE old_hit IS FALSE ORDER BY technology, id;
 ```
 
 All-day plateau is the fraction of observed days with any consecutive pair
@@ -34,9 +34,9 @@ Run the following from the repository root after the baseline and five-fold
 validation stages. Keep all stages on the same source snapshot.
 
 ```sh
-duckdb -bail database/part1_validation.duckdb < scripts/analysis/part1/winter_path.sql
-duckdb -bail database/part1_final.duckdb < scripts/analysis/part1/finish.sql
-duckdb -readonly database/part1_final.duckdb
+duckdb -bail database/meter_to_action.duckdb < scripts/analysis/part1/winter_path.sql
+duckdb -bail database/meter_to_action.duckdb < scripts/analysis/part1/finish.sql
+duckdb -readonly database/meter_to_action.duckdb
 ```
 
 Use `customer_devices` as the Part 1 entry point. It has exactly one row for

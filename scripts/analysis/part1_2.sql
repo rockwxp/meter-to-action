@@ -1,14 +1,15 @@
+USE intermediate;
 -- Weather enters as a lookup at interval start. Aggregate only the lookup to maintain join cardinality.
 CREATE OR REPLACE TEMP TABLE wx AS
 SELECT observation_date d, hour(observation_time)+1 he, avg(temp) temp
-FROM src.ods.weather_hourly GROUP BY ALL;
+FROM ods.weather_hourly GROUP BY ALL;
 
 -- Use daily profiles to find repeated overnight plateaus and scheduled daytime loads.
 CREATE OR REPLACE TABLE daily AS
 WITH h AS (
     SELECT customer_number id, usage_date d, hour_ending he, hourly_kwh k,
            lag(hourly_kwh) OVER w prev, lag(hour_ending) OVER w prev_he
-    FROM src.ods.ami_hourly
+    FROM ods.ami_hourly
     WINDOW w AS (PARTITION BY customer_number, usage_date ORDER BY hour_ending)
 )
 SELECT id,d,count(k) n, sum(k) energy, avg(k) mean_kw, min(k) low_kw,
@@ -58,9 +59,9 @@ SELECT f.id, f.hours, f.hours>=4380 AS sufficient_history,
  CASE WHEN hours>=4380 THEN cycling>=0.28 AND base_kw>=0.25 END hot_tub_signature,
  CASE WHEN hours>=4380 AND p.customer_number IS NOT NULL THEN midday_kw<0.35 AND evening_kw<0.65 END pv_storage_signature,
  ev_score,hp_score
-FROM features f LEFT JOIN src.ods.ev_customers e ON e.customer_number=f.id
-LEFT JOIN src.ods.hp_customers h ON h.customer_number=f.id
-LEFT JOIN src.ods.pv_customers p ON p.customer_number=f.id;
+FROM features f LEFT JOIN ods.ev_customers e ON e.customer_number=f.id
+LEFT JOIN ods.hp_customers h ON h.customer_number=f.id
+LEFT JOIN ods.pv_customers p ON p.customer_number=f.id;
 
 CREATE OR REPLACE TABLE segments AS
 SELECT id, CASE WHEN hours<4380 THEN 'Limited history'

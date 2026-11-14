@@ -1,7 +1,8 @@
+USE intermediate;
 -- In-sample opportunity screening. HE18..21 spans 17:00..21:00.
 CREATE OR REPLACE TABLE system_hour AS
 SELECT usage_date d,hour_ending he,sum(hourly_kwh) baseline_kw,count(hourly_kwh) meters
-FROM src.ods.ami_hourly GROUP BY ALL;
+FROM ods.ami_hourly GROUP BY ALL;
 
 CREATE OR REPLACE TEMP TABLE peak_hours AS
 SELECT * FROM system_hour WHERE he BETWEEN 18 AND 21
@@ -10,7 +11,7 @@ ORDER BY baseline_kw DESC,d,he LIMIT 100;
 CREATE OR REPLACE TABLE candidates AS
 WITH peaks AS (
  SELECT a.customer_number id,avg(a.hourly_kwh) peak_kw,count(a.hourly_kwh) sampled_peaks
- FROM src.ods.ami_hourly a JOIN peak_hours p ON a.usage_date=p.d AND a.hour_ending=p.he
+ FROM ods.ami_hourly a JOIN peak_hours p ON a.usage_date=p.d AND a.hour_ending=p.he
  GROUP BY 1
 )
 SELECT p.*, f.evening_kw AS target_kw, c.ev_reference OR c.ev_l2_signature AS flexible_ev,
@@ -28,7 +29,7 @@ WITH readings AS (
  SELECT a.customer_number id, usage_date d, hour_ending he, hourly_kwh k,
         greatest(hourly_kwh-c.target_kw,0) surplus, flexible_ev,
         count(hourly_kwh) OVER (PARTITION BY a.customer_number, usage_date)=24 AS full_day
- FROM src.ods.ami_hourly a JOIN candidates c ON a.customer_number=c.id AND c.priority<=500
+ FROM ods.ami_hourly a JOIN candidates c ON a.customer_number=c.id AND c.priority<=500
 ), dr AS (
  SELECT *,CASE WHEN full_day AND he BETWEEN 18 AND 21 THEN surplus ELSE 0 END requested,
  CASE WHEN full_day AND flexible_ev AND he BETWEEN 18 AND 21 THEN least(1.5,surplus) ELSE 0 END shifted

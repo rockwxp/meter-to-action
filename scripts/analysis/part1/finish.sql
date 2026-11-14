@@ -1,12 +1,12 @@
--- From repository root: duckdb -bail database/part1_final.duckdb < scripts/analysis/part1/finish.sql
+USE part1;
+-- From repository root: duckdb -bail database/meter_to_action.duckdb < scripts/analysis/part1/finish.sql
 -- Reuse the validated timer splits, ODS attachment and baseline attachment.
 .read scripts/analysis/part1/pool_validation.sql
-ATTACH 'database/part1_validation.duckdb' AS validated (READ_ONLY);
 BEGIN TRANSACTION;
 
 CREATE TEMP TABLE weather_days AS
 SELECT d,avg(t) t FROM (
- SELECT observation_date d,observation_time,avg(temp) t FROM odsdb.ods.weather_hourly GROUP BY ALL
+ SELECT observation_date d,observation_time,avg(temp) t FROM ods.weather_hourly GROUP BY ALL
 ) GROUP BY d;
 
 -- Compare morning pulses to a four-hour afternoon control window.
@@ -15,7 +15,7 @@ CREATE TEMP TABLE events AS
 WITH h AS (
  SELECT customer_number id,usage_date d,hour_ending he,hourly_kwh k,
  lag(hourly_kwh) OVER w prev,lead(hourly_kwh) OVER w nxt
- FROM odsdb.ods.ami_hourly
+ FROM ods.ami_hourly
  WINDOW w AS (PARTITION BY customer_number,usage_date ORDER BY hour_ending)
 ), daily_events AS (
  SELECT id,d,
@@ -28,8 +28,8 @@ WITH h AS (
 SELECT e.*,t,low_kw,midday_kw,evening_kw,night_kwh/6 night_kw,mean_kw,
  date_diff('week',DATE '2025-09-01',time_bucket(INTERVAL '1 week',d))%3 block,
  morning_steps>0 old_morning,night_steps>0 old_night
-FROM daily_events e JOIN prior.daily USING(id,d) LEFT JOIN weather_days USING(d)
-JOIN prior.classification c USING(id) WHERE c.sufficient_history;
+FROM daily_events e JOIN intermediate.daily USING(id,d) LEFT JOIN weather_days USING(d)
+JOIN intermediate.classification c USING(id) WHERE c.sufficient_history;
 
 CREATE TEMP TABLE rates_final AS
 SELECT id,fold,block=fold test,count(*) days_used,
@@ -47,8 +47,8 @@ FROM events CROSS JOIN range(3) f(fold) GROUP BY ALL HAVING count(*)>=28;
 CREATE TEMP TABLE pv_pairs AS
 SELECT a.id,b.id peer,a.fold FROM rates_final a
 JOIN rates_final b ON a.fold=b.fold AND a.id<>b.id AND NOT b.test
-JOIN prior.classification ca ON a.id=ca.id AND ca.known_pv
-JOIN prior.classification cb ON b.id=cb.id AND cb.known_pv
+JOIN intermediate.classification ca ON a.id=ca.id AND ca.known_pv
+JOIN intermediate.classification cb ON b.id=cb.id AND cb.known_pv
 WHERE NOT a.test AND a.mid<0.35 AND a.eve<0.65 AND NOT (b.mid<0.35 AND b.eve<0.65)
 QUALIFY row_number() OVER(PARTITION BY a.id,a.fold ORDER BY abs(a.overnight-b.overnight),b.id)=1;
 
@@ -59,7 +59,7 @@ FROM pv_pairs p JOIN events a ON a.id=p.id JOIN events b ON b.id=p.peer AND b.d=
 GROUP BY ALL HAVING count(*)>=28;
 
 CREATE OR REPLACE TABLE appliance_holdout AS
-SELECT r.id,r.fold,r.test,label,hit FROM rates_final r JOIN prior.classification c USING(id)
+SELECT r.id,r.fold,r.test,label,hit FROM rates_final r JOIN intermediate.classification c USING(id)
 LEFT JOIN matched m USING(id,fold,test),
 LATERAL (VALUES
  ('Water heater: baseline', morning>=0.30),
@@ -99,13 +99,13 @@ SELECT pop.id,c.hours,coalesce(c.sufficient_history,false) eligible,
  c.pool_signature seasonal_pool_screen,timer.rep pool_timer_repeats,
  c.water_heater_signature water_heater_screen,c.hot_tub_signature hot_tub_screen,
  c.pv_storage_signature pv_storage_screen,repeats.water_rep,repeats.tub_rep,repeats.pv_rep
-FROM range(1,35726) pop(id) LEFT JOIN prior.classification c USING(id)
-LEFT JOIN validated.screening s ON s.id=pop.id AND s.technology='ev'
-LEFT JOIN validated.hp_winter_screen h ON h.id=pop.id
+FROM range(1,35726) pop(id) LEFT JOIN intermediate.classification c USING(id)
+LEFT JOIN validation.screening s ON s.id=pop.id AND s.technology='ev'
+LEFT JOIN validation.hp_winter_screen h ON h.id=pop.id
 LEFT JOIN timer ON timer.id=pop.id LEFT JOIN repeats ON repeats.id=pop.id
-LEFT JOIN odsdb.ods.ev_customers ev ON ev.customer_number=pop.id
-LEFT JOIN odsdb.ods.hp_customers hp ON hp.customer_number=pop.id
-LEFT JOIN odsdb.ods.pv_customers pv ON pv.customer_number=pop.id;
+LEFT JOIN ods.ev_customers ev ON ev.customer_number=pop.id
+LEFT JOIN ods.hp_customers hp ON hp.customer_number=pop.id
+LEFT JOIN ods.pv_customers pv ON pv.customer_number=pop.id;
 SELECT CASE WHEN count(*)=35725 AND count(DISTINCT id)=35725 THEN true ELSE error('Invalid customer grain') END verified FROM customer_devices;
 COMMIT;
 SELECT * FROM rule_validation ORDER BY label,fold;

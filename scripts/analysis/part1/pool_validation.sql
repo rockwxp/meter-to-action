@@ -1,6 +1,5 @@
+USE part1;
 -- Run with an in-memory connection, from the repository root.
-ATTACH 'database/meter_to_action.duckdb' AS odsdb (READ_ONLY);
-ATTACH 'database/analysis_results.duckdb' AS prior (READ_ONLY);
 SET threads=12;
 SET memory_limit='42GiB';
 
@@ -9,7 +8,7 @@ CREATE TEMP TABLE eligible_days AS
 SELECT a.id,d,month(d) BETWEEN 5 AND 9 AS warm,
        date_diff('week',DATE '2025-09-01',time_bucket(INTERVAL '1 week',d))%3 AS block,
        pump_pairs>=3 AS old_event
-FROM prior.daily a JOIN prior.classification c USING(id)
+FROM intermediate.daily a JOIN intermediate.classification c USING(id)
 WHERE c.sufficient_history AND n=24 AND month(d) IN (5,6,7,8,9,12,1,2);
 
 -- Segment the full day before filtering daytime starts. Require a visible upward
@@ -18,7 +17,7 @@ CREATE TEMP TABLE runs AS
 WITH h AS (
  SELECT customer_number id,usage_date d,hour_ending he,hourly_kwh k,
     lag(hourly_kwh) OVER w prev,lead(hourly_kwh) OVER w nxt
- FROM odsdb.ods.ami_hourly JOIN eligible_days e ON e.id=customer_number AND e.d=usage_date
+ FROM ods.ami_hourly JOIN eligible_days e ON e.id=customer_number AND e.d=usage_date
  WINDOW w AS (PARTITION BY customer_number,usage_date ORDER BY hour_ending)
 ), in_band AS (
  SELECT *,sum(CASE WHEN prev BETWEEN 0.8 AND 3 AND abs(k-prev)<0.15 THEN 0 ELSE 1 END)

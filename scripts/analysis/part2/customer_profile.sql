@@ -1,3 +1,4 @@
+USE part2;
 -- Build inside segment.sql's transaction, with the ODS attached as raw.
 CREATE OR REPLACE TABLE customer_profile AS
 WITH peak AS (
@@ -5,7 +6,7 @@ WITH peak AS (
     FROM peak_contributions ORDER BY system_kw DESC, d, he LIMIT 1
 ), demand AS (
     SELECT a.customer_number, a.hourly_kwh
-    FROM raw.ods.ami_hourly a JOIN peak p ON a.usage_date=p.d AND a.hour_ending=p.he
+    FROM ods.ami_hourly a JOIN peak p ON a.usage_date=p.d AND a.hour_ending=p.he
 )
 SELECT s.id AS customer_id, s.segment,
        round(s.night_kw, 2) AS night_kw, round(s.midday_kw, 2) AS midday_kw,

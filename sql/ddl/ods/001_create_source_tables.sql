@@ -3,6 +3,11 @@
 BEGIN TRANSACTION;
 
 CREATE SCHEMA IF NOT EXISTS ods;
+CREATE SCHEMA IF NOT EXISTS intermediate;
+CREATE SCHEMA IF NOT EXISTS validation;
+CREATE SCHEMA IF NOT EXISTS part1;
+CREATE SCHEMA IF NOT EXISTS part2;
+CREATE SCHEMA IF NOT EXISTS part3;
 
 -- Each row represents one hourly usage record for one customer.
 CREATE TABLE IF NOT EXISTS ods.ami_hourly (

@@ -1,3 +1,4 @@
+USE validation;
 SELECT technology,count(*) eligible,countif(reference) reference_n,countif(old_hit) old_budget,
        countif(new_hit) new_budget,countif(reference AND old_hit) old_hits,
        countif(reference AND new_hit) new_hits,countif(reference AND NOT old_hit AND new_hit) recovered,

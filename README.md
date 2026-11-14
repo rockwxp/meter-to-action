@@ -24,10 +24,18 @@ The loader checks the supplied snapshot counts and preserves observations, inclu
 After the build, run these commands from the repository root. Replace 6233 with another customer number.
 
 ```bash
-duckdb -readonly database/part1_final.duckdb -c 'SELECT * FROM customer_characteristics WHERE customer_id = 6233'
-duckdb -readonly database/part2_final.duckdb -c 'SELECT * FROM customer_profile WHERE customer_id = 6233'
-duckdb -readonly database/part3_assessment.duckdb -c 'SELECT * FROM customer_assessment WHERE customer_id = 6233'
+duckdb -readonly database/meter_to_action.duckdb
 ```
+
+In this single session, query all three schemas:
+
+```sql
+SELECT * FROM part1.customer_characteristics WHERE customer_id = 6233;
+SELECT * FROM part2.customer_profile WHERE customer_id = 6233;
+SELECT * FROM part3.customer_assessment WHERE customer_id = 6233;
+```
+
+The database lives under `database/`. The `ods` schema holds source tables, `intermediate` holds shared features, and `validation` holds model validation. The three `partN` schemas expose the outputs. Earlier standalone analysis files from the local migration are archived under `database/legacy/`.
 
 | Output | Method | Interpretation |
 |---|---|---|
@@ -38,9 +46,9 @@ duckdb -readonly database/part3_assessment.duckdb -c 'SELECT * FROM customer_ass
 ## Methods and checks
 
 - **ODS:** `sql/ddl/ods/` defines the tables, `scripts/ingest/ods/` loads the data, and `sql/quality/ods/` checks duplicates, coverage, weather and reference-list linkage. The expected snapshot includes 306,671,987 AMI records and 8,761 weather records.
-- **Part 1:** `scripts/analysis/part1_2.sql` builds daily and customer features. `scripts/analysis/part1/` contains model validation, the winter heat pump path, appliance holdouts and the final score view. See the [Part 1 methodology](scripts/analysis/part1/README.md). To reproduce the thermal threshold sensitivity tables, run `duckdb -bail < scripts/analysis/part1/validate_thermal.sql` after building. Customers outside the EV and heat pump samples are unlabeled; load-signature repeatability measures behavioral stability.
+- **Part 1:** `scripts/analysis/part1_2.sql` builds daily and customer features. `scripts/analysis/part1/` contains model validation, the winter heat pump path, appliance holdouts and the final score view. See the [Part 1 methodology](scripts/analysis/part1/README.md). To reproduce the thermal threshold sensitivity tables, run `duckdb -bail database/meter_to_action.duckdb < scripts/analysis/part1/validate_thermal.sql` after building. Customers outside the EV and heat pump samples are unlabeled; load-signature repeatability measures behavioral stability.
 - **Part 2:** `scripts/analysis/part2/segment.sql` produces 24-hour group profiles, alternating-week agreement, and contributions at the 100 highest population hours. Missing AMI and limited seasonal history receive separate labels.
 - **Part 3:** `scripts/analysis/part3/opportunity.sql` evaluates 20 winter and 20 summer events. Storage is limited to 20.16 kWh and 7.68 kW, with a 90% usable energy window and 89.4% round-trip efficiency. `customer_event_impacts` reports the breakdown, including illustrative energy-charge savings at $0.30/kWh peak and $0.10/kWh recharge. The service-capacity scenario assumes 4 kW of incremental load and unity power factor. Actual tariffs, service headroom and solar surplus are unavailable. Rankings and impacts are historical scenario estimates.
-- **Intermediate results:** `analysis_results.duckdb` contains the shared features and exploratory baselines. Use the three final databases above for submission results. The same ID can carry multiple device signatures and exactly one behavior segment.
+- **Intermediate results:** `intermediate` contains the shared features and exploratory baselines. Use the three final schemas above for submission results. The same ID can carry multiple device signatures and exactly one behavior segment.
 
-The pipeline performs stage-level reconciliation. Run `duckdb -bail < sql/quality/verify_submission.sql` after a build to check the final customer grain, ID alignment, score bounds, and candidate rank direction.
+The pipeline performs stage-level reconciliation. Run `duckdb -bail database/meter_to_action.duckdb < sql/quality/verify_submission.sql` after a build to check the final customer grain, ID alignment, score bounds, and candidate rank direction.

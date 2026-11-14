@@ -1,7 +1,6 @@
--- From the repository root: duckdb -bail database/part2_final.duckdb < scripts/analysis/part2/segment.sql
+USE part2;
+-- From the repository root: duckdb -bail database/meter_to_action.duckdb < scripts/analysis/part2/segment.sql
 -- All interval timestamps use local hour-ending labels from the ODS.
-ATTACH 'database/meter_to_action.duckdb' AS raw (READ_ONLY);
-ATTACH 'database/part1_final.duckdb' AS devices (READ_ONLY);
 SET threads=12;
 SET memory_limit='40GiB';
 BEGIN TRANSACTION;
@@ -13,7 +12,7 @@ SELECT customer_number id,
        CASE WHEN month(usage_date) IN (12,1,2) THEN 'winter'
             WHEN month(usage_date) IN (6,7,8) THEN 'summer' ELSE 'shoulder' END season,
        hour_ending-1 h, sum(hourly_kwh) kwh,count(hourly_kwh) n
-FROM raw.ods.ami_hourly GROUP BY ALL;
+FROM ods.ami_hourly GROUP BY ALL;
 
 CREATE TEMP TABLE features AS
 WITH aggregated AS (
@@ -40,7 +39,7 @@ SELECT *,CASE
 CREATE OR REPLACE TABLE customer_segments AS
 SELECT d.*,coalesce(f.segment,'No AMI') segment,f.mean_kw,f.winter_kw,f.summer_kw,f.night_kw,
  f.midday_kw,f.evening_kw,a.segment even_week_segment,b.segment odd_week_segment
-FROM devices.customer_devices d LEFT JOIN features f ON d.id=f.id AND f.period=2
+FROM part1.customer_devices d LEFT JOIN features f ON d.id=f.id AND f.period=2
 LEFT JOIN features a ON d.id=a.id AND a.period=0
 LEFT JOIN features b ON d.id=b.id AND b.period=1;
 
@@ -52,11 +51,11 @@ FROM per_customer JOIN customer_segments USING(id) GROUP BY segment,h;
 
 CREATE TEMP TABLE system_peaks AS
 SELECT usage_date d,hour_ending he,sum(hourly_kwh) system_kw,count(hourly_kwh) meters
-FROM raw.ods.ami_hourly GROUP BY ALL ORDER BY system_kw DESC,d,he LIMIT 100;
+FROM ods.ami_hourly GROUP BY ALL ORDER BY system_kw DESC,d,he LIMIT 100;
 CREATE OR REPLACE TABLE peak_contributions AS
 WITH obs AS (
  SELECT p.d,p.he,s.segment,sum(a.hourly_kwh) kw,count(a.hourly_kwh) n
- FROM system_peaks p JOIN raw.ods.ami_hourly a ON a.usage_date=p.d AND a.hour_ending=p.he
+ FROM system_peaks p JOIN ods.ami_hourly a ON a.usage_date=p.d AND a.hour_ending=p.he
  JOIN customer_segments s ON s.id=a.customer_number GROUP BY ALL
 )
 SELECT p.*,g.segment,coalesce(o.kw,0) group_kw,coalesce(o.n,0) observed_customers

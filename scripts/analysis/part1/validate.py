@@ -41,27 +41,25 @@ def evaluate(db, tech, columns):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    for name, filename in (("ods","meter_to_action"),("baseline","analysis_results"),("output","part1_validation")):
-        parser.add_argument("--"+name, type=Path, default=ROOT/"database"/(filename+".duckdb"))
+    parser.add_argument("--database", type=Path, default=ROOT/"database/meter_to_action.duckdb")
     args = parser.parse_args()
-    with duckdb.connect(str(args.output)) as db:
-        for alias,path in (("odsdb",args.ods),("baseline",args.baseline)):
-            db.execute("ATTACH '"+str(path.resolve()).replace("'","''")+"' AS "+alias+" (READ_ONLY)")
+    with duckdb.connect(str(args.database)) as db:
+        db.execute("USE validation")
         db.execute("SET threads=12")
         db.execute("SET memory_limit='42GiB'")
         db.execute("BEGIN")
         db.execute(Path(__file__).with_name("signals.sql").read_text())
         db.execute("""CREATE OR REPLACE TABLE signals AS SELECT f.*,c.* EXCLUDE(id,hours),
-                      e.* EXCLUDE(id),h.* EXCLUDE(id) FROM baseline.features f
-                      JOIN baseline.classification c USING(id) JOIN extra_ev e USING(id)
+                      e.* EXCLUDE(id),h.* EXCLUDE(id) FROM intermediate.features f
+                      JOIN intermediate.classification c USING(id) JOIN extra_ev e USING(id)
                       LEFT JOIN extra_hp h USING(id)""")
         db.execute("""CREATE OR REPLACE TABLE screening(technology VARCHAR,id INTEGER,fold INTEGER,
                       reference BOOLEAN,old_hit BOOLEAN,new_hit BOOLEAN,ranking_score DOUBLE)""")
         evaluate(db,"ev",EV)
         evaluate(db,"hp",HP)
         db.execute("""CREATE OR REPLACE TABLE reference_audit AS
-          WITH labels AS (SELECT 'ev' technology,customer_number id FROM odsdb.ods.ev_customers
-                          UNION ALL SELECT 'hp',customer_number FROM odsdb.ods.hp_customers)
+          WITH labels AS (SELECT 'ev' technology,customer_number id FROM ods.ev_customers
+                          UNION ALL SELECT 'hp',customer_number FROM ods.hp_customers)
           SELECT l.*,f.hours,s.fold,s.old_hit,s.new_hit,s.ranking_score,f.l1,f.l2,f.plateau_any,
                  f.evening_step,f.step3,f.heating_kw,f.cooling_kw,f.winter_corr,
             CASE WHEN f.id IS NULL THEN 'Missing AMI'

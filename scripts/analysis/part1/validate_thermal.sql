@@ -1,14 +1,12 @@
 -- Run from the repository root using a fresh in-memory DuckDB CLI session:
 -- duckdb -bail < scripts/analysis/part1/validate_thermal.sql
-ATTACH 'database/meter_to_action.duckdb' AS raw (READ_ONLY);
-ATTACH 'database/analysis_results.duckdb' AS prior (READ_ONLY);
 
 -- Match the baseline daily weather calculation. Keep cold and extreme days
 -- in the same spell when temperatures cross 20 F without reaching 35 F.
 CREATE TEMP TABLE dates AS
 WITH hourly AS (
     SELECT observation_date d, observation_time, avg(temp) t
-    FROM raw.ods.weather_hourly GROUP BY ALL
+    FROM ods.weather_hourly GROUP BY ALL
 ), daily AS (SELECT d,avg(t) t FROM hourly GROUP BY d),
 bands AS (
     SELECT *, CASE WHEN t>75 THEN 'hot' WHEN t<35 THEN 'cold'
@@ -32,7 +30,7 @@ SELECT a.id, coalesce(split,'annual') split,
        avg(mean_kw) FILTER (WHERE t<20) - avg(mean_kw) FILTER (WHERE t<35) extreme_orig,
        avg(mean_kw) FILTER (WHERE t<20) - avg(mean_kw) FILTER (WHERE t>=20 AND t<35) extreme_sep,
        avg(mean_kw) FILTER (WHERE t>=20 AND t<35) - avg(mean_kw) FILTER (WHERE band='mild') heating_sep
-FROM prior.daily a JOIN dates USING(d) JOIN prior.classification c ON a.id=c.id AND c.sufficient_history
+FROM intermediate.daily a JOIN dates USING(d) JOIN intermediate.classification c ON a.id=c.id AND c.sufficient_history
 GROUP BY GROUPING SETS ((a.id,split),(a.id));
 
 CREATE TEMP TABLE grid AS
@@ -58,7 +56,7 @@ SELECT a.device,a.x,a.y,countif(a.hit) AS annual,countif(b.hit) AS train,
        countif(b.hit AND hp.customer_number IS NOT NULL) hp_train,
        countif(b.hit AND c.hit AND hp.customer_number IS NOT NULL) hp_repeat
 FROM flags a LEFT JOIN flags b ON (a.id,a.device,a.x,a.y)=(b.id,b.device,b.x,b.y) AND b.split='train' LEFT JOIN flags c ON (a.id,a.device,a.x,a.y)=(c.id,c.device,c.x,c.y) AND c.split='test'
-LEFT JOIN raw.ods.hp_customers hp ON hp.customer_number=a.id
+LEFT JOIN ods.hp_customers hp ON hp.customer_number=a.id
 WHERE a.split='annual'
 GROUP BY ALL ORDER BY a.device,a.x,a.y;
 
@@ -75,7 +73,7 @@ SELECT metric, CASE WHEN x<cut THEN 'below' ELSE 'above' END side,count(v) evalu
 FROM pairs WHERE x>=cut-width AND x<cut+width GROUP BY ALL ORDER BY metric,side;
 
 SELECT f.split, count(*) hp_with_history, countif(f.heating IS NOT NULL AND f.extreme_orig IS NOT NULL) hp_evaluable
-FROM features f JOIN raw.ods.hp_customers hp ON hp.customer_number=f.id GROUP BY f.split ORDER BY f.split;
+FROM features f JOIN ods.hp_customers hp ON hp.customer_number=f.id GROUP BY f.split ORDER BY f.split;
 
 -- Rotate all three spell blocks as holdouts for the shortlisted thresholds.
 WITH folds AS (
@@ -87,7 +85,7 @@ WITH folds AS (
  avg(mean_kw) FILTER(WHERE t<20)-avg(mean_kw) FILTER(WHERE t>=20 AND t<35) extreme_sep,
  avg(mean_kw) FILTER(WHERE t<35)-avg(mean_kw) FILTER(WHERE band='mild') cold_orig,
  avg(mean_kw) FILTER(WHERE t<20)-avg(mean_kw) FILTER(WHERE t<35) extreme_orig
- FROM prior.daily a JOIN folds USING(d) JOIN prior.classification c ON c.id=a.id AND c.sufficient_history
+ FROM intermediate.daily a JOIN folds USING(d) JOIN intermediate.classification c ON c.id=a.id AND c.sufficient_history
  GROUP BY ALL
 ), scored AS (
  SELECT id,fold,held_out,name,hit FROM contrasts,

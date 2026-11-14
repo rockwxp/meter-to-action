@@ -1,3 +1,4 @@
+USE part1;
 -- Ordinal ownership evidence, not calibrated probabilities.
 -- 0/10 require confirmed absence/presence. 5 is indeterminate.
 -- No confirmed device-absence labels exist in this snapshot.

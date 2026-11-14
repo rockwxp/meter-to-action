@@ -1,3 +1,4 @@
+USE part3;
 -- Customer decision: one row per customer. Peak reductions are means over
 -- the coincident system-peak hour of each evaluated event.
 CREATE OR REPLACE VIEW customer_assessment AS

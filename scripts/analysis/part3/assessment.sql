@@ -1,4 +1,5 @@
--- Run from repository root: duckdb -bail database/part3_assessment.duckdb < scripts/analysis/part3/assessment.sql
+USE part3;
+-- Run from repository root: duckdb -bail database/meter_to_action.duckdb < scripts/analysis/part3/assessment.sql
 .read scripts/analysis/part3/opportunity.sql
 BEGIN TRANSACTION;
 CREATE OR REPLACE TABLE assessment_values AS
@@ -20,7 +21,7 @@ SELECT c.*,s.events,s.shift_days,b.recurrent,m.peak_dr_kw,m.peak_bess_kw,
  i.review_hours,i.study_hours,p.known_pv
 FROM customer_opportunity c LEFT JOIN sizing s ON s.id=c.customer_id
 LEFT JOIN battery_design b ON b.id=c.customer_id LEFT JOIN opportunity_metrics m ON m.id=c.customer_id
-LEFT JOIN impacts i ON i.id=c.customer_id JOIN profiles.customer_segments p ON p.id=c.customer_id;
+LEFT JOIN impacts i ON i.id=c.customer_id JOIN part2.customer_segments p ON p.id=c.customer_id;
 
 .read scripts/analysis/part3/assessment_views.sql
 SELECT CASE WHEN count(*)=35725 AND count(DISTINCT customer_id)=35725 AND

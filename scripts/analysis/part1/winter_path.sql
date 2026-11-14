@@ -1,4 +1,5 @@
--- Run against database/part1_validation.duckdb after validate.py.
+USE validation;
+-- Run against database/meter_to_action.duckdb after validate.py.
 -- Preserve the original rule flag and use the existing out-of-fold HP model only
 -- for ranking households within each path. Reserve 15% of the original budget
 -- for the winter path, rounded down per fold. No labels enter path selection.
