@@ -1,0 +1,7 @@
+select count(*) customers, countif(sufficient_history) eligible,countif(ev_l2_signature) l2,countif(ev_l1_signature) l1,countif(ac_signature) ac,countif(hp_signature) hp,countif(strong_electric_heating_candidate) strong_electric_heating_candidate,countif(water_heater_signature) water,countif(pool_signature) pool,countif(hot_tub_signature) tub,countif(known_pv) pv,countif(pv_storage_signature) storage from classification;
+select countif(ev_reference and sufficient_history) ev_eval,countif(ev_reference and (ev_l2_signature or ev_l1_signature)) ev_hits,countif(hp_reference and sufficient_history) hp_eval,countif(hp_reference and hp_signature) hp_hits from classification;
+select segment,count(*) households,round(avg(evening_kw),2) evening_kw from segments join features using(id) group by 1 order by 2 desc;
+select count(*) screened,countif(priority<=500 and flexible_ev) pilot_flexible from candidates;
+select max(baseline_kw) original,max(dr_kw) dr,max(bess_kw) bess,max(joint_kw) joint,arg_max(d,baseline_kw) peak_date,arg_max(he,baseline_kw) peak_he,arg_max(meters,baseline_kw) meters from portfolio_hour;
+select count(*) pilot, sum(shifted_kwh) shifted,sum(discharged_kwh) discharged,median(p95_required_kw) median_power,median(p95_required_nameplate_kwh) median_size,avg(sizing_day_coverage) fraction_sized from candidate_benefits;
+select priority,id,round(peak_kw,2) peak_kw,round(p95_required_kw,2) p95_kw,round(p95_required_nameplate_kwh,2) p95_kwh from candidates join candidate_benefits using(id) order by priority limit 5;
